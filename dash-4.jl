@@ -160,12 +160,12 @@ md""" ## Setup """
 md""" ## Helper Code """
 
 # ╔═╡ 23a5f734-1164-11f0-0f33-3dacd11112c8
-df_all = CSV.read("dataset.csv", DataFrame)
+df_all = CSV.read("small-dataset.csv", DataFrame)
 
 # ╔═╡ cb06ff47-bdb1-468f-a55f-053683e4e4f3
 begin 
 
-df_clean = dropmissing(df_all, [:diameter, :albedo, :H, :i])
+df_clean = dropmissing(df_all, [:diameter, :albedo, :H])
 
 
 scatter(df_clean.diameter, df_clean.albedo,
@@ -332,13 +332,13 @@ df_subset = filter(row -> !ismissing(row.diameter) && row.diameter >= 1 && row.d
 # Remove rows with extreme or missing albedo values
 df_subset = filter(row -> !ismissing(row.albedo) && row.albedo <= 1.0, df_subset)
 
-df_subset = filter(row -> !ismissing(row.epoch_mjd) && row.epoch_mjd >= 59000, df_subset)
+# df_subset = filter(row -> !ismissing(row.epoch_mjd) && row.epoch_mjd >= 59000, df_subset)
 
 # Restrict semi-major axis and eccentricity ranges, handling missing values
-df_subset = filter(row -> !ismissing(row.a) && row.a <= 3 &&
-                          !ismissing(row.e) && row.e <= 0.5, df_subset)
+# df_subset = filter(row -> !ismissing(row.a) && row.a <= 3 &&
+#                           !ismissing(row.e) && row.e <= 0.5, df_subset)
 
-columns_to_keep = [:id, :name, :diameter, :albedo, :H, :a, :e, :neo, :pha]
+columns_to_keep = [:spkid, :diameter, :albedo, :H, :neo, :pha]
 df_subset = select(df_subset, columns_to_keep)
 
 first(df_subset, 10)
