@@ -59,36 +59,27 @@ md""" ### Select your Diameter & Albedo ranges and see plot """
 
 # ╔═╡ 063ef637-4579-4670-aa5c-a682c4ded999
 md""" 
-Diameter: $(@bind diameter_range Slider(0:940, default=10))
-Albedo: $(@bind albedo_range Slider(0:0.0001:1, default = 0.15))
+Diameter: $(@bind diameter_range Slider(0:15, default=10))
+Albedo: $(@bind albedo_range Slider(0:0.0001:0.250, default = 0.15))
 """
 
-# ╔═╡ a564bcba-7cec-4f9a-84b9-5731da612c16
-# begin
-# filtered_data_slider = filter(row ->
-#     row.diameter ≤ diameter_range &&    # <= single slider value
-#     row.albedo   ≤ albedo_range,        # <= single slider value
-#     df_clean
-# )
+# ╔═╡ 98c02609-2cc0-4f63-bd92-df1b78ebb146
+md""" ### Object Type: $(@bind obj_category Select(["All Types", "NEO", "PHA"]))"""
 
+# ╔═╡ cecc1c3b-5ea0-4826-87de-90fc02fbd625
+md""" ### Observation """
 
-# scatter(filtered_data_slider.diameter, filtered_data_slider.albedo;
-#     xlabel = "Diameter (km)",
-#     ylabel = "Albedo",
-#     title  = "Diameter vs. Albedo (Filtered)",
-#     markersize = 4,
-#     legend = false
-# )
-# end
+# ╔═╡ 70dad8a1-46d5-4150-bc3e-9a2e622f9bf0
+md""" As we go higher and higher for the values of albedo and diameter, we observe that the highest concentration of our data goes into our bottom right corner, and this only gets worse as we go farther in this range, we can see that at albedo of 1, and diameter of 940 km, our data is concentrated in just a few pixels at the bottom right corner. 
+Which is why those extreme values have been excused from the bounds of this plot so the data you observe can be meaningful.
+"""
+
 
 # ╔═╡ 5f5f51ee-a71c-44fb-aaaa-f3d20322e499
 md""" # Model Fitting"""
 
 # ╔═╡ 4136ecb7-8c23-4f28-9429-687943d3cfe1
 md""" ## Simple Model """
-
-# ╔═╡ 98c02609-2cc0-4f63-bd92-df1b78ebb146
-@bind obj_category Select(["All Types", "NEO", "PHA"])
 
 # ╔═╡ 84f29daa-020b-47bc-a089-824efc367c78
 md""" ## Sophisticated Models  """
@@ -127,22 +118,21 @@ And we can see that both of these models - simple and polynomial are nearly equi
 md""" ### Residual Plots ### """
 
 # ╔═╡ 00c1e958-feb9-48af-84fc-d7f9dfd4cda0
-md"""Now we know, A well-fitted model produces residuals that are randomly distributed around zero without discernible patterns. I don't see any predominant patterns here but there is a tail in both models on the lower right side so honestly I don't know what and how much to make of it. """
+md"""The residual plots show that the simple model leaves clear patterns and clusters in the residuals, especially with two separate groups above and below the zero-error line. This suggests the simple model underfits the data and cannot fully capture the true relationship.
+
+The polynomial model improves the fit: its residuals are more tightly packed around the zero line and display a more symmetric, random spread. This indicates less bias and a better match between the model predictions and the real data. Overall, the polynomial model provides a more accurate and reliable fit compared to the simple model. """
 
 # ╔═╡ 639d976f-8e34-4ca2-a730-68bf0a14514a
-md""" For residual histograms, as long as residuals should be evenly distributed around zero without systematic patterns or clustering. And as we can see, this plot is infact centered around zero but without any obvious patterns.  """
+md""" For residual histograms, the residuals should be symmetrically distributed around zero, ideally forming a bell-shaped or mound-shaped curve. This indicates that the model's errors are unbiased and mostly random. In this plot, the residuals are roughly centered near zero, but the distribution is slightly skewed, suggesting some remaining bias in the simple model.  """
 
 # ╔═╡ fb9f67de-8188-4612-9df1-8a1bd1256d4f
-md""" # Plotting the entire dataset """
+md""" # How big is this dataset? """
 
 # ╔═╡ 5871f92f-101e-4ada-902f-476901ab3fa1
-md""" To illustrate the scale and quantity of data we are working with. """
+md""" Lest plot the entire dataset to illustrate the scale and quantity of data we are working with. """
 
-# ╔═╡ fba55f83-17b0-44b4-b23c-d518b1142955
-md""" 1. Plotting __*all the datapoints*__  (diameter v/s albedo)  """
-
-# ╔═╡ 35deee9f-3fdb-4315-bdf6-997d2d73e1b0
-md""" 2. Plotting __*all the datapoints*__  (diameter v/s Absolute Magnitude)  """
+# ╔═╡ 9a75296f-2b3c-485c-a3c6-0fdc2bb1620a
+md""" ### Diameter v/s $(@bind Graph_Type Select(["Albedo", "Absolute Magnitude"])) """
 
 # ╔═╡ 1e3d77a7-9d7b-4fae-aaa8-5a6b946f3ab1
 md""" # Setup & Helper Code """
@@ -162,27 +152,34 @@ md""" ## Helper Code """
 # ╔═╡ 23a5f734-1164-11f0-0f33-3dacd11112c8
 df_all = CSV.read("small-dataset.csv", DataFrame)
 
-# ╔═╡ cb06ff47-bdb1-468f-a55f-053683e4e4f3
+# ╔═╡ 105081ed-774e-4d46-bc9b-367d9570bd81
 begin 
+	
+# Filter NEOs and PHAs, handling missing values
+df_subset = filter(row -> (!ismissing(row.neo) && row.neo == "Y") || 
+                          (!ismissing(row.pha) && row.pha == "Y"), df_all)
 
-df_clean = dropmissing(df_all, [:diameter, :albedo, :H])
+# Filter by diameter range, handling missing values
+df_subset = filter(row -> !ismissing(row.diameter) && row.diameter >= 1 && row.diameter <= 50, df_subset)
 
+# Remove rows with extreme or missing albedo values
+df_subset = filter(row -> !ismissing(row.albedo) && row.albedo <= 1.0, df_subset)
 
-scatter(df_clean.diameter, df_clean.albedo,
-    xlabel="Diameter (km)", ylabel="Albedo",
-    title="Diameter vs. Albedo of Celestial Objects",
-    legend=false, alpha=0.5, markersize=3)
-xaxis!(:log)
+# df_subset = filter(row -> !ismissing(row.epoch_mjd) && row.epoch_mjd >= 59000, df_subset)
 
+# Restrict semi-major axis and eccentricity ranges, handling missing values
+# df_subset = filter(row -> !ismissing(row.a) && row.a <= 3 &&
+#                           !ismissing(row.e) && row.e <= 0.5, df_subset)
 
-# Add a logarithmic scale for x-axis if the diameter range is very large
-xaxis!(:log)
+columns_to_keep = [:spkid, :diameter, :albedo, :H, :neo, :pha]
+df_subset = select(df_subset, columns_to_keep)
 
-# Customize the plot
-plot!(size=(800, 600), dpi=300)
-plot!(fontfamily="Computer Modern")
+first(df_subset, 10)
 
 end
+
+# ╔═╡ 9926ef06-bfab-424d-86c7-883f050e2d6c
+df_clean = dropmissing(df_all, [:diameter, :albedo, :H])
 
 # ╔═╡ 4c3979b8-79de-48b8-8694-e998f852b700
 begin
@@ -207,37 +204,57 @@ end
 
 # ╔═╡ 8845a27a-8128-4ee3-acf7-d55756eb0d38
 begin
-    filtered_data_slider = filter(row -> 
-        row.diameter <= diameter_range && 
-        row.albedo <= albedo_range,
-        df_clean
-    )
-
-    x = filtered_data_slider.diameter
-    y = filtered_data_slider.albedo
-
-    grid_x = range(minimum(x), stop=maximum(x), length=250)  # Increased grid resolution
-    grid_y = range(minimum(y), stop=maximum(y), length=250)  # Increased grid resolution
-    
-    z = zeros(Float64, length(grid_x), length(grid_y))
-    for i in 1:length(x)
-        xi = findfirst(ge -> ge >= x[i], grid_x)
-        yi = findfirst(ge -> ge >= y[i], grid_y)
-        z[xi, yi] += 1  # Increase the density at the grid point
+    # Step 1: Correct object type filtering
+    filtered_data_category = if obj_category == "NEO"
+        filter(row -> coalesce(row.neo, "N") == "Y", df_clean)
+    elseif obj_category == "PHA"
+        filter(row -> coalesce(row.pha, "N") == "Y", df_clean)
+    else
+        df_clean  # All types
     end
-
-    smoothed_z = imfilter(z, Kernel.gaussian(3))  # Apply Gaussian filter with kernel size 3
-
-    contour_levels = range(0, stop=maximum(smoothed_z), length=25)  # Specify 20 contour levels
-
-    contour(grid_x, grid_y, smoothed_z',
-        xlabel="Diameter (km)",
-        ylabel="Albedo",
-        title="Diameter vs. Albedo (Refined Contour)",
-        c=:viridis, 
-        colorbar=true, 
-        levels=contour_levels  
+	
+    # Step 2: Now apply slider filters
+    filtered_data_slider = filter(row ->
+        row.diameter <= diameter_range &&
+        row.albedo <= albedo_range,
+        filtered_data_category
     )
+
+
+    if isempty(filtered_data_slider)
+        md"""‼️Value too low, No data found. Please adjust the sliders. ‼️"""
+    else
+        x = filtered_data_slider.diameter
+        y = filtered_data_slider.albedo
+
+        grid_x = range(minimum(x), stop=maximum(x), length=250)
+        grid_y = range(minimum(y), stop=maximum(y), length=250)
+
+		n_objects = nrow(filtered_data_slider)
+		plot_title = "Diameter vs. Albedo: $obj_category ($n_objects objects)"
+
+
+        z = zeros(Float64, length(grid_x), length(grid_y))
+        for i in 1:length(x)
+            xi = findfirst(ge -> ge >= x[i], grid_x)
+            yi = findfirst(ge -> ge >= y[i], grid_y)
+            z[xi, yi] += 1
+        end
+
+        smoothed_z = imfilter(z, Kernel.gaussian(3))
+
+        contour_levels = range(0, stop=maximum(smoothed_z), length=15)
+
+        contourf(
+            grid_x, grid_y, smoothed_z',
+            xlabel="Diameter (km)",
+            ylabel="Albedo",
+            title=plot_title,
+            c=:thermal,
+            colorbar=true,
+            levels=contour_levels
+        )
+    end
 end
 
 
@@ -300,50 +317,33 @@ mean_rmse_poly = mean(rmses_poly)
 println("Average RMSE (log10) for polynomial model across $k folds: $mean_rmse_poly")
 end
 
-# ╔═╡ 51133a7e-cf01-4bcf-a540-c8be018507f1
-begin 
+# ╔═╡ c507cf9b-24b7-4aba-9dfc-3ef70b8dabcc
+begin
+    # df_clean = dropmissing(df_all, [:diameter, :albedo, :H])
 
-scatter(df_clean.diameter, df_clean.H,
-    xlabel="Diameter (km)", ylabel="Absolute Magnitude",
-    title="Diameter vs. Absolute Magnitude of Celestial Objects",
-    legend=false, alpha=0.5, markersize=3)
-xaxis!(:log)
+    if Graph_Type == "Albedo"
+        scatter(
+            df_clean.diameter, df_clean.albedo,
+            xlabel="Diameter (km)", ylabel="Albedo",
+            title="Diameter vs. Albedo of Celestial Objects",
+            legend=false, alpha=0.5, markersize=3
+        )
+    elseif Graph_Type == "Absolute Magnitude"
+        scatter(
+            df_clean.diameter, df_clean.H,
+            xlabel="Diameter (km)", ylabel="Absolute Magnitude",
+            title="Diameter vs. Absolute Magnitude of Celestial Objects",
+            legend=false, alpha=0.5, markersize=3
+        )
+    end
 
+    xaxis!(:log)
 
-# Add a logarithmic scale for x-axis if the diameter range is very large
-xaxis!(:log)
-
-# Customize the plot
-plot!(size=(800, 600), dpi=300)
-plot!(fontfamily="Computer Modern")
-
+    # Customize the plot
+    plot!(size=(800, 600), dpi=300)
+    plot!(fontfamily="Computer Modern")
 end
 
-# ╔═╡ 105081ed-774e-4d46-bc9b-367d9570bd81
-begin 
-	
-# Filter NEOs and PHAs, handling missing values
-df_subset = filter(row -> (!ismissing(row.neo) && row.neo == "Y") || 
-                          (!ismissing(row.pha) && row.pha == "Y"), df_all)
-
-# Filter by diameter range, handling missing values
-df_subset = filter(row -> !ismissing(row.diameter) && row.diameter >= 1 && row.diameter <= 50, df_subset)
-
-# Remove rows with extreme or missing albedo values
-df_subset = filter(row -> !ismissing(row.albedo) && row.albedo <= 1.0, df_subset)
-
-# df_subset = filter(row -> !ismissing(row.epoch_mjd) && row.epoch_mjd >= 59000, df_subset)
-
-# Restrict semi-major axis and eccentricity ranges, handling missing values
-# df_subset = filter(row -> !ismissing(row.a) && row.a <= 3 &&
-#                           !ismissing(row.e) && row.e <= 0.5, df_subset)
-
-columns_to_keep = [:spkid, :diameter, :albedo, :H, :neo, :pha]
-df_subset = select(df_subset, columns_to_keep)
-
-first(df_subset, 10)
-
-end
 
 # ╔═╡ 844e9480-6409-487b-a1e1-a534af8f1e0e
 begin 
@@ -389,18 +389,44 @@ end
 
 # ╔═╡ 22abebe5-fdc8-41de-8df2-cb4882982b6a
 begin
-	# Compute residuals for the simple model (in log space)
-y_obs_log  = log10.(df_clean.diameter)
-y_pred_log = predict(model_simple, df_clean)
-residuals_simple = y_obs_log .- y_pred_log
+    # Step 1: Compute residuals
+    y_obs_log = log10.(df_clean.diameter)
+    y_pred_log = predict(model_simple, df_clean)
+    residuals_simple = y_obs_log .- y_pred_log
 
-scatter(df_clean.H, residuals_simple,
-    xlabel="Absolute Magnitude (H)",
-    ylabel="Residual (log10 diameter)",
-    title="Residuals vs. H (Simple Model)",
-    label="Residuals", markerstrokecolor=:black)
-hline!([0], linestyle=:dash, color=:red, label="Zero Error")
+    # Step 2: Histogram bins
+    h_bins = range(extrema(df_clean.H)..., length=120)
+    r_bins = range(extrema(residuals_simple)..., length=120)
+    hist = fit(Histogram, (df_clean.H, residuals_simple), (h_bins, r_bins))
+
+    # Step 3: Plot with zoomed in axes
+    contourf(
+        hist.edges[1][1:end-1], hist.edges[2][1:end-1], hist.weights',
+        xlabel = "Absolute Magnitude (H)",
+        ylabel = "Residual (log₁₀ diameter)",
+        title = "Residuals vs. H (Simple Model) – Refined Contour (Zoomed)",
+        colorbar = true,
+        fill = true,
+        linewidth = 0.8,
+        levels = 15,
+        c = :thermal,
+        size = (900, 700),
+        legend = true,
+        framestyle = :box,
+        xlims = (11, 19),   # <<< adjust based on where your data is clustered
+        ylims = (-0.40, 0.30) # <<< adjust based on your residual range
+    )
+
+    # Step 4: Zero residual line
+    plot!(
+        [10, 20], [0, 0],  # match xlims here
+        linewidth = 2,
+        linestyle = :dash,
+        color = :red,
+        label = "Zero Error"
+    )
 end
+
 
 # ╔═╡ fa03c48d-148d-47db-9075-bbfb43d1db03
 histogram(residuals_simple,
@@ -432,18 +458,55 @@ end
 
 
 # ╔═╡ fbcfd034-efd3-4593-b58e-ff09b8dd95ab
-begin 
-	# Compute residuals for the polynomial model
-y_pred_log_poly = predict(model_poly, df_poly)
-residuals_poly = log10.(df_poly.diameter) .- y_pred_log_poly
+begin
+    # Step 1: Compute residuals for the polynomial model
+    y_pred_log_poly = predict(model_poly, df_poly)
+    residuals_poly = log10.(df_poly.diameter) .- y_pred_log_poly
 
-scatter(df_poly.H, residuals_poly,
-    xlabel="Absolute Magnitude (H)",
-    ylabel="Residual (log10 diameter)",
-    title="Residuals vs. H (Polynomial Model)",
-    label="Residuals", markerstrokecolor=:black)
-hline!([0], linestyle=:dash, color=:red, label="Zero Error")
+    # Step 2: Histogram bins
+    h_bins_poly = range(extrema(df_poly.H)..., length=120)
+    r_bins_poly = range(extrema(residuals_poly)..., length=120)
+    hist_poly = fit(Histogram, (df_poly.H, residuals_poly), (h_bins_poly, r_bins_poly))
+
+    # Step 3: Contour plot
+    contourf(
+        hist_poly.edges[1][1:end-1], hist_poly.edges[2][1:end-1], hist_poly.weights',
+        xlabel = "Absolute Magnitude (H)",
+        ylabel = "Residual (log₁₀ diameter)",
+        title = "Residuals vs. H (Polynomial Model) – Refined Contour",
+        colorbar = true,
+        fill = true,
+        linewidth = 0.8,
+        levels = 15,
+        c = :thermal,
+        size = (900, 700),
+        legend = true,
+        framestyle = :box,
+        xlims = (11, 19),      # same zoomed range for fair comparison
+        ylims = (-0.40, 0.30)   # same residual zoom
+    )
+
+    # Step 4: Zero residual line
+    plot!(
+        [11, 19], [0, 0],
+        linewidth = 2,
+        linestyle = :dash,
+        color = :red,
+        label = "Zero Error"
+    )
 end
+
+
+# ╔═╡ ddaead7e-bb84-46ec-ab7c-0c24e1e4b7a8
+histogram(residuals_poly,
+    xlabel = "Residual (log₁₀ diameter)",
+    ylabel = "Frequency",
+    title = "Residual Histogram (Polynomial Model)",
+    label = "",
+    nbins = 20,
+    alpha = 0.7
+)
+
 
 # ╔═╡ ed4abdd9-222c-4915-8f58-bbeede9038fd
 begin
@@ -3429,21 +3492,22 @@ version = "1.4.1+2"
 # ╟─d0e98841-50a6-4f70-83ba-897d2c3fbbf3
 # ╟─172da2ca-984a-4509-b274-5f4c600cb735
 # ╟─2b240d0b-7500-4f70-9314-212d50814910
-# ╠═4c3979b8-79de-48b8-8694-e998f852b700
+# ╟─4c3979b8-79de-48b8-8694-e998f852b700
 # ╟─961fe282-4e6e-4d7e-9657-4e51f905168b
 # ╟─063ef637-4579-4670-aa5c-a682c4ded999
-# ╟─a564bcba-7cec-4f9a-84b9-5731da612c16
+# ╟─98c02609-2cc0-4f63-bd92-df1b78ebb146
 # ╠═8845a27a-8128-4ee3-acf7-d55756eb0d38
+# ╟─cecc1c3b-5ea0-4826-87de-90fc02fbd625
+# ╟─70dad8a1-46d5-4150-bc3e-9a2e622f9bf0
 # ╟─5f5f51ee-a71c-44fb-aaaa-f3d20322e499
 # ╟─4136ecb7-8c23-4f28-9429-687943d3cfe1
 # ╠═beed29eb-c8f0-4c25-9fa7-17e4732bd167
-# ╟─98c02609-2cc0-4f63-bd92-df1b78ebb146
 # ╟─84f29daa-020b-47bc-a089-824efc367c78
 # ╟─05968260-e412-4eea-9e1b-b4f97098c51c
-# ╠═284e6dfc-a1e1-4c91-a869-55029fd9346d
+# ╟─284e6dfc-a1e1-4c91-a869-55029fd9346d
 # ╟─6e56805b-2f3e-4f59-9115-ed9dc061bd6c
 # ╟─387fbd61-5e81-4a21-a43d-dd43a9aeadeb
-# ╠═512b0430-0004-4228-b6c1-93e12605f6f9
+# ╟─512b0430-0004-4228-b6c1-93e12605f6f9
 # ╟─3787330c-eb77-4eec-822f-6e6e0b167bb9
 # ╟─a232cd78-240d-490e-b395-6183cde7c725
 # ╟─47b7dacf-537f-4421-9316-fff529792e5f
@@ -3454,22 +3518,22 @@ version = "1.4.1+2"
 # ╟─22abebe5-fdc8-41de-8df2-cb4882982b6a
 # ╟─fbcfd034-efd3-4593-b58e-ff09b8dd95ab
 # ╟─00c1e958-feb9-48af-84fc-d7f9dfd4cda0
-# ╟─fa03c48d-148d-47db-9075-bbfb43d1db03
+# ╠═fa03c48d-148d-47db-9075-bbfb43d1db03
 # ╟─639d976f-8e34-4ca2-a730-68bf0a14514a
+# ╟─ddaead7e-bb84-46ec-ab7c-0c24e1e4b7a8
 # ╟─fb9f67de-8188-4612-9df1-8a1bd1256d4f
 # ╟─5871f92f-101e-4ada-902f-476901ab3fa1
-# ╟─fba55f83-17b0-44b4-b23c-d518b1142955
-# ╟─cb06ff47-bdb1-468f-a55f-053683e4e4f3
-# ╟─35deee9f-3fdb-4315-bdf6-997d2d73e1b0
-# ╟─51133a7e-cf01-4bcf-a540-c8be018507f1
+# ╟─9a75296f-2b3c-485c-a3c6-0fdc2bb1620a
+# ╟─c507cf9b-24b7-4aba-9dfc-3ef70b8dabcc
 # ╟─1e3d77a7-9d7b-4fae-aaa8-5a6b946f3ab1
 # ╟─4eb93250-19ce-4cd6-af0a-0c78b5ea2a2e
 # ╟─8a325ab9-6534-456a-addb-0d767ff23121
-# ╠═151fe0bd-0d54-44f0-a8c4-fe6187ff8f06
+# ╟─151fe0bd-0d54-44f0-a8c4-fe6187ff8f06
 # ╠═6a802e6f-ecd4-4c7f-9a9d-d184d7363d0c
-# ╠═affe1b9b-89d3-4961-8776-6f4daf765617
+# ╟─affe1b9b-89d3-4961-8776-6f4daf765617
 # ╠═23a5f734-1164-11f0-0f33-3dacd11112c8
 # ╠═105081ed-774e-4d46-bc9b-367d9570bd81
+# ╠═9926ef06-bfab-424d-86c7-883f050e2d6c
 # ╠═844e9480-6409-487b-a1e1-a534af8f1e0e
 # ╠═31767b72-c2e9-464f-989e-6d04d1124af7
 # ╠═ea4d8828-aa0d-4096-8805-7a6102fddc83
