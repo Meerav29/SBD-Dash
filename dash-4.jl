@@ -51,8 +51,14 @@ md""" This dashboard allows users to explore and analyze characteristics of smal
 # ╔═╡ d0e98841-50a6-4f70-83ba-897d2c3fbbf3
 md""" ## Select your Data for Visualization """
 
-# ╔═╡ 172da2ca-984a-4509-b274-5f4c600cb735
-md""" ### Select your object type """
+# ╔═╡ 98c02609-2cc0-4f63-bd92-df1b78ebb146
+md""" ### Select your Object Type: $(@bind obj_category Select(["All Types", "NEO", "PHA"]))"""
+
+# ╔═╡ 62ecab8d-7093-4dc4-b050-d53c2df34286
+md""" ### Use log diameter for all plots: $(@bind use_log_diameter_1 CheckBox(default=false))"""
+
+# ╔═╡ b2c7ad62-e443-4592-a3c0-4b65fb0e5e4d
+md""" See the above plot as a Density Plot instead: $(@bind use_contour_1 CheckBox(default=false))"""
 
 # ╔═╡ 961fe282-4e6e-4d7e-9657-4e51f905168b
 md""" ### Select your Diameter & Albedo ranges and see plot """
@@ -62,9 +68,6 @@ md"""
 Diameter: $(@bind diameter_range Slider(0:15, default=10))
 Albedo: $(@bind albedo_range Slider(0:0.0001:0.250, default = 0.15))
 """
-
-# ╔═╡ 98c02609-2cc0-4f63-bd92-df1b78ebb146
-md""" ### Object Type: $(@bind obj_category Select(["All Types", "NEO", "PHA"]))"""
 
 # ╔═╡ cecc1c3b-5ea0-4826-87de-90fc02fbd625
 md""" ### Observation """
@@ -80,6 +83,9 @@ md""" # Model Fitting"""
 
 # ╔═╡ 4136ecb7-8c23-4f28-9429-687943d3cfe1
 md""" ## Simple Model """
+
+# ╔═╡ 7dd8f695-9ce7-423b-ae06-04802d0c202c
+@bind use_contour_2 CheckBox(default=false)  # Add this above the plot block
 
 # ╔═╡ 84f29daa-020b-47bc-a089-824efc367c78
 md""" ## Sophisticated Models  """
@@ -152,6 +158,54 @@ md""" ## Helper Code """
 # ╔═╡ 23a5f734-1164-11f0-0f33-3dacd11112c8
 df_all = CSV.read("small-dataset.csv", DataFrame)
 
+# ╔═╡ 4c3979b8-79de-48b8-8694-e998f852b700
+begin
+    # Filter based on dropdown
+    filtered_data = if obj_category == "NEO"
+        filter(row -> coalesce(row.neo, "N") == "Y", df_all)
+    elseif obj_category == "PHA"
+        filter(row -> coalesce(row.pha, "N") == "Y", df_all)
+    else
+        df_all
+    end
+
+    # Filter rows where diameter is nonmissing and positive
+    # Clean data
+filtered_data = filter(row -> !ismissing(row.diameter) && row.diameter > 0, filtered_data)
+
+# Extract plot data
+x_data_1 = filtered_data.H
+y_data_1 = use_log_diameter_1 ? log10.(filtered_data.diameter) : filtered_data.diameter
+
+# Filter out NaNs after log transformation
+valid_mask = .!(ismissing.(x_data_1) .| ismissing.(y_data_1) .| isnan.(x_data_1) .| isnan.(y_data_1))
+x_data_1 = x_data_1[valid_mask]
+y_data_1 = y_data_1[valid_mask]
+    y_label = use_log_diameter_1 ? "log₁₀(Diameter)" : "Diameter (km)"
+
+    if length(x_data_1) == 0 || length(y_data_1) == 0
+    "⚠️ No data available for this selection. Try changing the filters."
+elseif use_contour_1
+    density(x_data_1, y_data_1,
+        xlabel="Absolute Magnitude (H)",
+        ylabel=y_label,
+        title="Objects: $obj_category",
+        fill=true,
+        c=:viridis)
+else
+    scatter(x_data_1, y_data_1,
+        xlabel="Absolute Magnitude (H)",
+        ylabel=y_label,
+        title="Objects: $obj_category",
+        marker=:circle, markersize=6,
+        legend=false)
+end
+end
+
+
+# ╔═╡ 2b240d0b-7500-4f70-9314-212d50814910
+("Number of objects selected: ", nrow(filtered_data))
+
 # ╔═╡ 105081ed-774e-4d46-bc9b-367d9570bd81
 begin 
 	
@@ -180,27 +234,6 @@ end
 
 # ╔═╡ 9926ef06-bfab-424d-86c7-883f050e2d6c
 df_clean = dropmissing(df_all, [:diameter, :albedo, :H])
-
-# ╔═╡ 4c3979b8-79de-48b8-8694-e998f852b700
-begin
-	filtered_data = if obj_category == "NEO"
-    # Filter rows where the :neo column is "Y". Use coalesce to treat missing as "N"
-    filter(row -> coalesce(row.neo, "N") == "Y", df_all)
-elseif obj_category == "PHA"
-    filter(row -> coalesce(row.pha, "N") == "Y", df_all)
-else
-    df_clean  # All data if "All" is selected
-end
-	scatter(filtered_data.H, filtered_data.diameter,
-        xlabel="Absolute Magnitude (H)",
-        ylabel="Diameter (km)",
-        title="Objects: $obj_category",
-        marker=:circle, markersize=6,
-        legend=false)
-end 
-
-# ╔═╡ 2b240d0b-7500-4f70-9314-212d50814910
-("Number of objects selected: ", nrow(filtered_data))
 
 # ╔═╡ 8845a27a-8128-4ee3-acf7-d55756eb0d38
 begin
@@ -364,28 +397,46 @@ end
 model_simple = lm(@formula(log10(diameter) ~ H), filtered_data)
 
 # ╔═╡ beed29eb-c8f0-4c25-9fa7-17e4732bd167
-begin 
-	
-	x_data = filtered_data.H
-	sorted_idx = sortperm(x_data)
+begin
+    x_data = filtered_data.H
+    y_data = use_log_diameter_1 ? log10.(filtered_data.diameter) : filtered_data.diameter
+    sorted_idx = sortperm(x_data)
 
-# predictions
-y_pred = predict(model_simple, filtered_data)
+    # predictions
+    y_pred = predict(model_simple, filtered_data)
+    y_pred_plot = use_log_diameter_1 ? y_pred : 10 .^ y_pred
+    y_label_2 = use_log_diameter_1 ? "log₁₀(Diameter)" : "Diameter (km)"
 
-# Plot the data
-scatter(x_data, filtered_data.diameter,
-    label="Data",
-    xlabel="Absolute Magnitude (H)",
-    ylabel="Diameter (km)",
-    title="Linear Fit: diameter ~ H")
+    if length(x_data) == 0 || length(y_data) == 0
+        "⚠️ No data available for this selection."
+    elseif use_contour_2
+        # Density plot with model overlay
+        density(x_data, y_data,
+            xlabel="Absolute Magnitude (H)",
+            ylabel=y_label_2,
+            title="Linear Fit: diameter ~ H (Density)",
+            fill=true,
+            c=:blues)
 
-# Plot the fitted line (sorted)
-plot!(
-    x_data[sorted_idx],
-    10 .^ (y_pred[sorted_idx]),  
-    label="Linear model",
-    color=:red)
+        plot!(x_data[sorted_idx],
+              y_pred_plot[sorted_idx],
+              label="Linear model",
+              color=:red)
+    else
+        # Standard scatter plot
+        scatter(x_data, y_data,
+            label="Data",
+            xlabel="Absolute Magnitude (H)",
+            ylabel=y_label_2,
+            title="Linear Fit: diameter ~ H")
+
+        plot!(x_data[sorted_idx],
+              y_pred_plot[sorted_idx],
+              label="Linear model",
+              color=:red)
+    end
 end
+
 
 # ╔═╡ 22abebe5-fdc8-41de-8df2-cb4882982b6a
 begin
@@ -439,21 +490,33 @@ model_poly = lm(@formula(log10(diameter) ~ H + (H^2)), filtered_data)
 
 # ╔═╡ 284e6dfc-a1e1-4c91-a869-55029fd9346d
 begin
-	
-    log_pred       = predict(model_poly, filtered_data)
-    pred_diameter  = 10 .^ log_pred
+    x_data_3 = filtered_data.H
+    sorted_idx_1 = sortperm(x_data)
 
-    scatter(filtered_data.H,
-            filtered_data.diameter,
-            label="Data",
-            xlabel="Absolute Magnitude (H)",
-            ylabel="Diameter (km)",
-            title="Polynomial Fit: log10(diameter) ~ H + H²")
+    # Get model predictions in log space
+    log_pred = predict(model_poly, filtered_data)
 
-	plot!( filtered_data.H[sorted_idx],
-           pred_diameter[sorted_idx],
-           label="Quadratic model",
-           color=:red )
+    # Apply log10 transformation to actual diameters if needed
+    y_data_3 = use_log_diameter_1 ? log10.(filtered_data.diameter) : filtered_data.diameter
+
+    # Predicted values for plotting (sorted)
+    y_pred_plot_3 = use_log_diameter_1 ? log_pred : 10 .^ log_pred
+
+    y_label_3 = use_log_diameter_1 ? "log₁₀(Diameter)" : "Diameter (km)"
+
+    # Plot the data
+    scatter(x_data_3, y_data_3,
+        label="Data",
+        xlabel="Absolute Magnitude (H)",
+        ylabel=y_label_3,
+        title="Polynomial Fit: log₁₀(diameter) ~ H + H²")
+
+    # Plot the fitted curve
+    plot!(
+        x_data_3[sorted_idx_1],
+        y_pred_plot_3[sorted_idx_1],
+        label="Quadratic model",
+        color=:red)
 end
 
 
@@ -532,34 +595,58 @@ end
 
 # ╔═╡ 512b0430-0004-4228-b6c1-93e12605f6f9
 begin
+    # H range for prediction
+    H_range_4 = range(minimum(H_data), stop=maximum(H_data), length=100)
 
-H_range = range(minimum(H_data), stop=maximum(H_data), length=100)
-# β convert matrices to single vetors 
-β0_mat = Array(chain[:β0])
-β1_mat = Array(chain[:β1])
-β0_samples = vec(β0_mat)
-β1_samples = vec(β1_mat)
+    # Convert MCMC chain matrices to vectors
+    β0_mat_4 = Array(chain[:β0])
+    β1_mat_4 = Array(chain[:β1])
+    β0_samples_4 = vec(β0_mat_4)
+    β1_samples_4 = vec(β1_mat_4)
 
-# median prediction and 95% credible intervals
-predictions = [β0_samples .+ β1_samples * h for h in H_range]
-pred_medians = [median(p) for p in predictions]
-pred_lower = [quantile(p, 0.025) for p in predictions]
-pred_upper = [quantile(p, 0.975) for p in predictions]
+    # Generate predictions over H_range
+    predictions_4 = [β0_samples_4 .+ β1_samples_4 .* h for h in H_range_4]
 
-# Converting from log10 scale 
-diam_pred_medians = 10 .^ pred_medians
-diam_pred_lower = 10 .^ pred_lower
-diam_pred_upper = 10 .^ pred_upper
+    pred_medians_4 = [median(p) for p in predictions_4]
+    pred_lower_4 = [quantile(p, 0.025) for p in predictions_4]
+    pred_upper_4 = [quantile(p, 0.975) for p in predictions_4]
 
-# Scatter
-scatter(H_data, filtered_data.diameter, label="Data", xlabel="Absolute Magnitude (H)", ylabel="Diameter (km)",
-        title="Bayesian Linear Fit: log10(diameter) ~ H")
-# Median Prediction
-plot!(H_range, diam_pred_medians, label="Median Prediction", lw=2, color=:red)
-# 95% credible interval
-plot!(H_range, diam_pred_lower, ribbon=(diam_pred_medians .- diam_pred_lower, diam_pred_upper .- diam_pred_medians),
-      fillalpha=0.2, label="95% Credible Interval")
+    # Apply inverse-log transform if needed
+    if use_log_diameter_1
+        y_data_4 = log10.(filtered_data.diameter)
+        y_label_4 = "log₁₀(Diameter)"
+        pred_medians_plot_4 = pred_medians_4
+        pred_lower_plot_4 = pred_lower_4
+        pred_upper_plot_4 = pred_upper_4
+    else
+        y_data_4 = filtered_data.diameter
+        y_label_4 = "Diameter (km)"
+        pred_medians_plot_4 = 10 .^ pred_medians_4
+        pred_lower_plot_4 = 10 .^ pred_lower_4
+        pred_upper_plot_4 = 10 .^ pred_upper_4
+    end
+
+    # Scatter plot of actual data
+    scatter(H_data, y_data_4,
+        label="Data",
+        xlabel="Absolute Magnitude (H)",
+        ylabel=y_label_4,
+        title="Bayesian Linear Fit: log₁₀(diameter) ~ H")
+
+    # Median prediction line
+    plot!(H_range_4, pred_medians_plot_4,
+        label="Median Prediction",
+        lw=2,
+        color=:red)
+
+    # 95% credible interval ribbon
+    plot!(H_range_4,
+        pred_lower_plot_4,
+        ribbon=(pred_upper_plot_4 .- pred_medians_plot_4, pred_medians_plot_4 .- pred_lower_plot_4),
+        fillalpha=0.2,
+        label="95% Credible Interval")
 end
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3490,24 +3577,26 @@ version = "1.4.1+2"
 # ╟─9ddca2f5-d664-42fa-8db6-e6ce500486fc
 # ╟─96c7917b-cab8-4034-b763-04db489a9660
 # ╟─d0e98841-50a6-4f70-83ba-897d2c3fbbf3
-# ╟─172da2ca-984a-4509-b274-5f4c600cb735
+# ╟─98c02609-2cc0-4f63-bd92-df1b78ebb146
 # ╟─2b240d0b-7500-4f70-9314-212d50814910
+# ╠═62ecab8d-7093-4dc4-b050-d53c2df34286
 # ╟─4c3979b8-79de-48b8-8694-e998f852b700
+# ╟─b2c7ad62-e443-4592-a3c0-4b65fb0e5e4d
 # ╟─961fe282-4e6e-4d7e-9657-4e51f905168b
 # ╟─063ef637-4579-4670-aa5c-a682c4ded999
-# ╟─98c02609-2cc0-4f63-bd92-df1b78ebb146
-# ╠═8845a27a-8128-4ee3-acf7-d55756eb0d38
+# ╟─8845a27a-8128-4ee3-acf7-d55756eb0d38
 # ╟─cecc1c3b-5ea0-4826-87de-90fc02fbd625
 # ╟─70dad8a1-46d5-4150-bc3e-9a2e622f9bf0
 # ╟─5f5f51ee-a71c-44fb-aaaa-f3d20322e499
 # ╟─4136ecb7-8c23-4f28-9429-687943d3cfe1
+# ╟─7dd8f695-9ce7-423b-ae06-04802d0c202c
 # ╠═beed29eb-c8f0-4c25-9fa7-17e4732bd167
 # ╟─84f29daa-020b-47bc-a089-824efc367c78
 # ╟─05968260-e412-4eea-9e1b-b4f97098c51c
-# ╟─284e6dfc-a1e1-4c91-a869-55029fd9346d
+# ╠═284e6dfc-a1e1-4c91-a869-55029fd9346d
 # ╟─6e56805b-2f3e-4f59-9115-ed9dc061bd6c
 # ╟─387fbd61-5e81-4a21-a43d-dd43a9aeadeb
-# ╟─512b0430-0004-4228-b6c1-93e12605f6f9
+# ╠═512b0430-0004-4228-b6c1-93e12605f6f9
 # ╟─3787330c-eb77-4eec-822f-6e6e0b167bb9
 # ╟─a232cd78-240d-490e-b395-6183cde7c725
 # ╟─47b7dacf-537f-4421-9316-fff529792e5f
