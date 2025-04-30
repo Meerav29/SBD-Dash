@@ -38,6 +38,7 @@ begin
 	using Images, ImageFiltering
 	using Statistics 
 	using StatsBase
+	using KernelDensity
 
 	Random.seed!(42)                     
 end;
@@ -54,11 +55,11 @@ md""" ## Select your Data for Visualization """
 # ╔═╡ 98c02609-2cc0-4f63-bd92-df1b78ebb146
 md""" ### Select your Object Type: $(@bind obj_category Select(["All Types", "NEO", "PHA"]))"""
 
+# ╔═╡ e13e42f2-0366-4ef4-8987-39c7d7c4086b
+@bind plot_style Select(["Standard Scatter", "Scatter w/ Log Diameter", "Scatter_alpha", "Heatmap"])
+
 # ╔═╡ 62ecab8d-7093-4dc4-b050-d53c2df34286
 md""" ### Use log diameter for all plots: $(@bind use_log_diameter_1 CheckBox(default=false))"""
-
-# ╔═╡ b2c7ad62-e443-4592-a3c0-4b65fb0e5e4d
-md""" See the above plot as a Density Plot instead: $(@bind use_contour_1 CheckBox(default=false))"""
 
 # ╔═╡ 961fe282-4e6e-4d7e-9657-4e51f905168b
 md""" ### Select your Diameter & Albedo ranges and see plot """
@@ -83,9 +84,6 @@ md""" # Model Fitting"""
 
 # ╔═╡ 4136ecb7-8c23-4f28-9429-687943d3cfe1
 md""" ## Simple Model """
-
-# ╔═╡ 7dd8f695-9ce7-423b-ae06-04802d0c202c
-@bind use_contour_2 CheckBox(default=false)  # Add this above the plot block
 
 # ╔═╡ 84f29daa-020b-47bc-a089-824efc367c78
 md""" ## Sophisticated Models  """
@@ -157,54 +155,6 @@ md""" ## Helper Code """
 
 # ╔═╡ 23a5f734-1164-11f0-0f33-3dacd11112c8
 df_all = CSV.read("small-dataset.csv", DataFrame)
-
-# ╔═╡ 4c3979b8-79de-48b8-8694-e998f852b700
-begin
-    # Filter based on dropdown
-    filtered_data = if obj_category == "NEO"
-        filter(row -> coalesce(row.neo, "N") == "Y", df_all)
-    elseif obj_category == "PHA"
-        filter(row -> coalesce(row.pha, "N") == "Y", df_all)
-    else
-        df_all
-    end
-
-    # Filter rows where diameter is nonmissing and positive
-    # Clean data
-filtered_data = filter(row -> !ismissing(row.diameter) && row.diameter > 0, filtered_data)
-
-# Extract plot data
-x_data_1 = filtered_data.H
-y_data_1 = use_log_diameter_1 ? log10.(filtered_data.diameter) : filtered_data.diameter
-
-# Filter out NaNs after log transformation
-valid_mask = .!(ismissing.(x_data_1) .| ismissing.(y_data_1) .| isnan.(x_data_1) .| isnan.(y_data_1))
-x_data_1 = x_data_1[valid_mask]
-y_data_1 = y_data_1[valid_mask]
-    y_label = use_log_diameter_1 ? "log₁₀(Diameter)" : "Diameter (km)"
-
-    if length(x_data_1) == 0 || length(y_data_1) == 0
-    "⚠️ No data available for this selection. Try changing the filters."
-elseif use_contour_1
-    density(x_data_1, y_data_1,
-        xlabel="Absolute Magnitude (H)",
-        ylabel=y_label,
-        title="Objects: $obj_category",
-        fill=true,
-        c=:viridis)
-else
-    scatter(x_data_1, y_data_1,
-        xlabel="Absolute Magnitude (H)",
-        ylabel=y_label,
-        title="Objects: $obj_category",
-        marker=:circle, markersize=6,
-        legend=false)
-end
-end
-
-
-# ╔═╡ 2b240d0b-7500-4f70-9314-212d50814910
-("Number of objects selected: ", nrow(filtered_data))
 
 # ╔═╡ 105081ed-774e-4d46-bc9b-367d9570bd81
 begin 
@@ -378,6 +328,26 @@ begin
 end
 
 
+# ╔═╡ e56955fc-c3ff-49f3-a89c-660d785d1b8b
+begin
+	filtered_data = if obj_category == "NEO"
+    filter(row -> coalesce(row.neo, "N") == "Y", df_all)
+elseif obj_category == "PHA"
+    filter(row -> coalesce(row.pha, "N") == "Y", df_all)
+else
+    df_all
+end
+
+# Filter for valid values
+filter(row ->
+    !ismissing(row.H) && !ismissing(row.diameter) && row.diameter > 0,
+    filtered_data
+)
+end
+
+# ╔═╡ 2b240d0b-7500-4f70-9314-212d50814910
+("Number of objects selected: ", nrow(filtered_data))
+
 # ╔═╡ 844e9480-6409-487b-a1e1-a534af8f1e0e
 begin 
 	# using Statistics
@@ -404,37 +374,24 @@ begin
 
     # predictions
     y_pred = predict(model_simple, filtered_data)
+
+    # Adjust prediction output if log scale is used
     y_pred_plot = use_log_diameter_1 ? y_pred : 10 .^ y_pred
     y_label_2 = use_log_diameter_1 ? "log₁₀(Diameter)" : "Diameter (km)"
 
-    if length(x_data) == 0 || length(y_data) == 0
-        "⚠️ No data available for this selection."
-    elseif use_contour_2
-        # Density plot with model overlay
-        density(x_data, y_data,
-            xlabel="Absolute Magnitude (H)",
-            ylabel=y_label_2,
-            title="Linear Fit: diameter ~ H (Density)",
-            fill=true,
-            c=:blues)
+    # Plot the data
+    scatter(x_data, y_data,
+        label="Data",
+        xlabel="Absolute Magnitude (H)",
+        ylabel=y_label_2,
+        title="Linear Fit: diameter ~ H")
 
-        plot!(x_data[sorted_idx],
-              y_pred_plot[sorted_idx],
-              label="Linear model",
-              color=:red)
-    else
-        # Standard scatter plot
-        scatter(x_data, y_data,
-            label="Data",
-            xlabel="Absolute Magnitude (H)",
-            ylabel=y_label_2,
-            title="Linear Fit: diameter ~ H")
-
-        plot!(x_data[sorted_idx],
-              y_pred_plot[sorted_idx],
-              label="Linear model",
-              color=:red)
-    end
+    # Plot the fitted line (sorted)
+    plot!(
+        x_data[sorted_idx],
+        y_pred_plot[sorted_idx],
+        label="Linear model",
+        color=:red)
 end
 
 
@@ -478,6 +435,67 @@ begin
     )
 end
 
+
+# ╔═╡ 242855a1-4485-4a1e-b10e-5f7712012560
+begin
+
+
+# Step 3: Extract x and y values
+x_vals = filtered_data.H
+y_vals_raw = filtered_data.diameter
+y_vals_log = log10.(y_vals_raw)
+
+# Step 4: Choose which y to use
+if plot_style in ["Scatter w/ Log Diameter", "Scatter_alpha", "Heatmap"]
+    y_vals = y_vals_log
+    y_label = "log₁₀(Diameter)"
+else
+    y_vals = y_vals_raw
+    y_label = "Diameter (km)"
+end
+
+# Step 5: Convert to arrays for plotting
+x_vals = collect(x_vals)
+y_vals = collect(y_vals)
+
+# Step 6: Final safety check for NaNs
+valid_mask = .!(ismissing.(x_vals) .| ismissing.(y_vals) .| isnan.(x_vals) .| isnan.(y_vals))
+x_vals = x_vals[valid_mask]
+y_vals = y_vals[valid_mask]
+
+# Step 7: Plot it
+if length(x_vals) == 0 || length(y_vals) == 0
+    md"""⚠️ **No data available for this selection. Try changing the filters.**"""
+else
+    if plot_style == "Standard Scatter"
+        scatter(x_vals, y_vals,
+            xlabel="Absolute Magnitude (H)", ylabel=y_label,
+            title="Objects: $obj_category", marker=:circle,
+            markersize=6, legend=false)
+
+    elseif plot_style == "Scatter w/ Log Diameter"
+        scatter(x_vals, y_vals,
+            xlabel="Absolute Magnitude (H)", ylabel=y_label,
+            title="Scatter Plot", legend=false)
+
+    elseif plot_style == "Scatter_alpha"
+        scatter(x_vals, y_vals, alpha=0.2,
+            xlabel="Absolute Magnitude (H)", ylabel=y_label,
+            title="Scatter Plot (Transparent)", legend=false)
+
+    elseif plot_style == "Heatmap"
+        xbins = range(minimum(x_vals), stop=maximum(x_vals), length=80)
+        ybins = range(minimum(y_vals), stop=maximum(y_vals), length=80)
+        hist_heat = fit(Histogram, (x_vals, y_vals), (xbins, ybins))
+
+        heatmap(hist.edges[1], hist.edges[2], hist.weights',
+            xlabel="Absolute Magnitude (H)", ylabel=y_label,
+            title="Heatmap", interpolate=true)
+    end
+end
+
+	
+end
 
 # ╔═╡ fa03c48d-148d-47db-9075-bbfb43d1db03
 histogram(residuals_simple,
@@ -659,6 +677,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 MLUtils = "f1d291b0-491e-4a28-83b9-f70985020b54"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -680,6 +699,7 @@ Distributions = "~0.25.118"
 GLM = "~1.9.0"
 ImageFiltering = "~0.7.9"
 Images = "~0.26.2"
+KernelDensity = "~0.6.9"
 LaTeXStrings = "~1.4.0"
 MLUtils = "~0.4.7"
 Plots = "~1.40.7"
@@ -698,7 +718,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "9d8269191c2a6b4836ac075a346483f2269fa50c"
+project_hash = "00a682ebbae866ffa576c41b812d1258e2913c8b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -3579,9 +3599,9 @@ version = "1.4.1+2"
 # ╟─d0e98841-50a6-4f70-83ba-897d2c3fbbf3
 # ╟─98c02609-2cc0-4f63-bd92-df1b78ebb146
 # ╟─2b240d0b-7500-4f70-9314-212d50814910
-# ╠═62ecab8d-7093-4dc4-b050-d53c2df34286
-# ╟─4c3979b8-79de-48b8-8694-e998f852b700
-# ╟─b2c7ad62-e443-4592-a3c0-4b65fb0e5e4d
+# ╟─e13e42f2-0366-4ef4-8987-39c7d7c4086b
+# ╟─242855a1-4485-4a1e-b10e-5f7712012560
+# ╟─62ecab8d-7093-4dc4-b050-d53c2df34286
 # ╟─961fe282-4e6e-4d7e-9657-4e51f905168b
 # ╟─063ef637-4579-4670-aa5c-a682c4ded999
 # ╟─8845a27a-8128-4ee3-acf7-d55756eb0d38
@@ -3589,14 +3609,13 @@ version = "1.4.1+2"
 # ╟─70dad8a1-46d5-4150-bc3e-9a2e622f9bf0
 # ╟─5f5f51ee-a71c-44fb-aaaa-f3d20322e499
 # ╟─4136ecb7-8c23-4f28-9429-687943d3cfe1
-# ╟─7dd8f695-9ce7-423b-ae06-04802d0c202c
 # ╠═beed29eb-c8f0-4c25-9fa7-17e4732bd167
 # ╟─84f29daa-020b-47bc-a089-824efc367c78
 # ╟─05968260-e412-4eea-9e1b-b4f97098c51c
 # ╠═284e6dfc-a1e1-4c91-a869-55029fd9346d
 # ╟─6e56805b-2f3e-4f59-9115-ed9dc061bd6c
 # ╟─387fbd61-5e81-4a21-a43d-dd43a9aeadeb
-# ╠═512b0430-0004-4228-b6c1-93e12605f6f9
+# ╟─512b0430-0004-4228-b6c1-93e12605f6f9
 # ╟─3787330c-eb77-4eec-822f-6e6e0b167bb9
 # ╟─a232cd78-240d-490e-b395-6183cde7c725
 # ╟─47b7dacf-537f-4421-9316-fff529792e5f
@@ -3613,7 +3632,7 @@ version = "1.4.1+2"
 # ╟─fb9f67de-8188-4612-9df1-8a1bd1256d4f
 # ╟─5871f92f-101e-4ada-902f-476901ab3fa1
 # ╟─9a75296f-2b3c-485c-a3c6-0fdc2bb1620a
-# ╟─c507cf9b-24b7-4aba-9dfc-3ef70b8dabcc
+# ╠═c507cf9b-24b7-4aba-9dfc-3ef70b8dabcc
 # ╟─1e3d77a7-9d7b-4fae-aaa8-5a6b946f3ab1
 # ╟─4eb93250-19ce-4cd6-af0a-0c78b5ea2a2e
 # ╟─8a325ab9-6534-456a-addb-0d767ff23121
@@ -3623,6 +3642,7 @@ version = "1.4.1+2"
 # ╠═23a5f734-1164-11f0-0f33-3dacd11112c8
 # ╠═105081ed-774e-4d46-bc9b-367d9570bd81
 # ╠═9926ef06-bfab-424d-86c7-883f050e2d6c
+# ╠═e56955fc-c3ff-49f3-a89c-660d785d1b8b
 # ╠═844e9480-6409-487b-a1e1-a534af8f1e0e
 # ╠═31767b72-c2e9-464f-989e-6d04d1124af7
 # ╠═ea4d8828-aa0d-4096-8805-7a6102fddc83
