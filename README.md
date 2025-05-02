@@ -11,8 +11,8 @@ This project taught me how to effectively clean, transform, and visualize real-w
 
 ### 4. Suggestions for Future Projects (1 point)
 To make this project more valuable in future semesters, I suggest:
-- Integrating **peer review sessions** midway through the project timeline so students can get feedback from others working on different datasets or approaches. This could spark new ideas and improve overall quality.
-- Providing a **curated collection of example plots and analyses** from past projects that students can learn from or build upon to deepen their understanding of what strong data storytelling looks like. (I think the second one has already been discussed in class, but I just wanted to reiterate because I think it would be very valuable.)
+- Integrating peer review sessions midway through the project timeline so students can get feedback from others working on different datasets or approaches. This could spark new ideas and improve overall quality.
+- Providing a curated collection of example plots and analyse* from past projects that students can learn from or build upon to deepen their understanding of what strong data storytelling looks like. (I think the second one has already been discussed in class, but I just wanted to reiterate because I think it would be very valuable.)
 
 ### 5. Suggestions for Improving the Course (optional)
 One way to improve the course is to include short expert talks or mini-lectures about current research topics in astrostatistics. This would help students see the real-world applications of the techniques they are learning. Additionally, incorporating a few **comparison projects** could diversify the kinds of insights students explore and share.
